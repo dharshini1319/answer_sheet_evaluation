@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Answer Evaluator | Next-Gen NLP</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="container">
+        <header class="hero">
+            <div class="badge">AI-Powered Evaluation</div>
+            <h1>AI Answer Sheet Evaluator</h1>
+            <p>Leverage state-of-the-art Natural Language Processing to score student answers against correct keys with precision.</p>
+        </header>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash-messages">
+                {% for message in messages %}
+                  <div class="flash-item">
+                      <span class="icon">⚠️</span>
+                      {{ message }}
+                  </div>
+                {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <section class="main-content">
+            <form action="/evaluate" method="post" enctype="multipart/form-data" id="evalForm">
+                <div class="dual-input-grid">
+                    <!-- Student Input Column -->
+                    <div class="input-card" id="studentCard">
+                        <div class="card-header">
+                            <div class="step-num">01</div>
+                            <h3>Student Submission</h3>
+                        </div>
+                        <div class="mode-selector">
+                            <button type="button" class="mode-btn active" onclick="toggleMode('student', 'file')">Files</button>
+                            <button type="button" class="mode-btn" onclick="toggleMode('student', 'folder')">Folder</button>
+                            <button type="button" class="mode-btn" onclick="toggleMode('student', 'text')">Direct Text</button>
+                        </div>
+                        
+                        <div id="student-file-container" class="mode-container">
+                            <div class="upload-box" onclick="document.getElementById('student_file').click()">
+                                <div class="upload-icon">📂</div>
+                                <p>Click to upload Multiple Files</p>
+                                <input type="file" name="student_file" id="student_file" hidden multiple onchange="updateFileName(this, 'student-name')">
+                                <span id="student-name" class="file-name"></span>
+                            </div>
+                        </div>
+                        
+                        <div id="student-text-container" class="mode-container hidden">
+                            <textarea name="student_text" placeholder="Paste student answer content here..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Key Input Column -->
+                    <div class="input-card" id="correctCard">
+                        <div class="card-header">
+                            <div class="step-num">02</div>
+                            <h3>Correct Answer Key</h3>
+                        </div>
+                        <div class="mode-selector">
+                            <button type="button" class="mode-btn active" onclick="toggleMode('correct', 'file')">File Upload</button>
+                            <button type="button" class="mode-btn" onclick="toggleMode('correct', 'text')">Direct Text</button>
+                        </div>
+                        
+                        <div id="correct-file-container" class="mode-container">
+                            <div class="upload-box" onclick="document.getElementById('correct_file').click()">
+                                <div class="upload-icon">✅</div>
+                                <p>Upload answer key (.pdf, .txt)</p>
+                                <input type="file" name="correct_file" id="correct_file" hidden onchange="updateFileName(this, 'correct-name')">
+                                <span id="correct-name" class="file-name"></span>
+                            </div>
+                        </div>
+                        
+                        <div id="correct-text-container" class="mode-container hidden">
+                            <textarea name="correct_text" placeholder="Paste correct answer key here..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-area">
+                    <button type="submit" class="submit-btn" id="evaluate_btn">
+                        <span class="btn-content">Evaluate Folder</span>
+                        <div class="btn-glare"></div>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        {% if results %}
+        <section class="result-section show" id="results">
+            <div class="result-card wide-card">
+                <div class="result-header">
+                    <h2>Batch Evaluation Report</h2>
+                    <div class="timestamp">Individual File Analysis</div>
+                </div>
+                
+                <div class="results-table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Student File</th>
+                                <th>Score</th>
+                                <th>Performance</th>
+                                <th>Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res in results %}
+                            <tr>
+                                <td class="file-name-cell">{{ res.filename }}</td>
+                                <td class="score-cell">{{ res.score }} <span class="max-score">/ 10</span></td>
+                                <td>
+                                    <div class="feedback-badge grade-{{ res.feedback.lower().replace(' ', '-') }}">
+                                        {{ res.feedback }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="stat-progress mini">
+                                        <div class="progress-bar js-progress" data-score="{{ res.score }}"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="result-footer">
+                    <a href="/" class="retry-btn">New Evaluation</a>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        <footer>
+            <p>&copy; 2026 AI Evaluation System. Bulk Analysis Enabled.</p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleMode(type, mode) {
+            const containers = {
+                file: document.getElementById(`${type}-file-container`),
+                text: document.getElementById(`${type}-text-container`)
+            };
+            const btns = document.querySelectorAll(`#${type}Card .mode-btn`);
+            const fileInput = document.getElementById(`${type}_file`);
+            const uploadLabel = document.querySelector(`#${type}-file-container .upload-box p`);
+
+            // Reset buttons
+            btns.forEach(b => b.classList.remove('active'));
+
+            if (mode === 'text') {
+                containers.file.classList.add('hidden');
+                containers.text.classList.remove('hidden');
+                // Active button is last one for text mode
+                btns[btns.length - 1].classList.add('active');
+            } else {
+                containers.file.classList.remove('hidden');
+                containers.text.classList.add('hidden');
+                
+                if (type === 'student') {
+                    if (mode === 'folder') {
+                        fileInput.setAttribute('webkitdirectory', '');
+                        fileInput.setAttribute('directory', '');
+                        uploadLabel.textContent = "Click to upload Folder";
+                        btns[1].classList.add('active');
+                    } else {
+                        fileInput.removeAttribute('webkitdirectory');
+                        fileInput.removeAttribute('directory');
+                        uploadLabel.textContent = "Click to upload Multiple Files";
+                        btns[0].classList.add('active');
+                    }
+                } else {
+                    // Correct key card only has File/Text
+                    btns[0].classList.add('active');
+                }
+            }
+        }
+
+        function updateFileName(input, targetId) {
+            let message = "";
+            if (input.files.length > 1) {
+                message = input.files.length + " files/folder selected";
+            } else if (input.files[0]) {
+                message = input.files[0].name;
+            }
+            document.getElementById(targetId).textContent = message;
+            if (message) {
+                input.parentElement.classList.add('has-file');
+            }
+        }
+
+        // Apply all progress bar widths
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.js-progress').forEach(bar => {
+                const score = bar.getAttribute('data-score');
+                bar.style.width = (parseFloat(score) * 10) + '%';
+            });
+        });
+    </script>
+</body>
+</html>
+
+
